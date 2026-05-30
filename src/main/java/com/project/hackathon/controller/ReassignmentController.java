@@ -57,12 +57,12 @@ public class ReassignmentController {
     public ResponseEntity<Void> updateSuggestion(@PathVariable String id, @RequestBody Map<String, String> body) {
         SuggestionStatus status = SuggestionStatus.valueOf(body.get("status"));
 
-        if ("ACCEPTED".equalsIgnoreCase(String.valueOf(status))) {
-            reassignmentEngine.approveReassignment(id);
-        } else if ("REJECTED".equalsIgnoreCase(String.valueOf(status))) {
-            reassignmentEngine.rejectReassignment(id);
-        } else {
-            return ResponseEntity.badRequest().build();
+        switch (status) {
+            case ACCEPTED -> reassignmentEngine.approveReassignment(id);
+            case REJECTED -> reassignmentEngine.rejectReassignment(id);
+            default -> {
+                return ResponseEntity.badRequest().build();
+            }
         }
 
         return ResponseEntity.ok().build();
@@ -71,8 +71,6 @@ public class ReassignmentController {
     // Existing endpoint for dashboard polling
     @GetMapping("/reassignments/proposals")
     public List<ReassignmentProposal> getPendingProposals() {
-        return proposalRepository.findAll().stream()
-                .filter(p -> SuggestionStatus.PENDING.equals(p.getStatus()))
-                .toList();
+        return proposalRepository.findByStatus(SuggestionStatus.PENDING);
     }
 }

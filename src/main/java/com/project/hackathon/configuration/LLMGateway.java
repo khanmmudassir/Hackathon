@@ -24,11 +24,6 @@ public class LLMGateway {
 
     private final RestClient http = RestClient.create();
 
-    /**
-     * Sends prompt to the configured LLM and returns the raw text
-     * response. Throws RuntimeException on HTTP error or unparseable
-     * response — caller is responsible for fallback handling.
-     */
     public String callLLM(String prompt) {
         return switch (provider.toLowerCase()) {
             case "gemini" -> callGemini(prompt);
