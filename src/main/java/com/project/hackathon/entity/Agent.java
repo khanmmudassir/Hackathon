@@ -1,5 +1,6 @@
 package com.project.hackathon.entity;
 
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import com.project.hackathon.constants.AgentStatus;
 import jakarta.persistence.*;
 import lombok.*;
@@ -27,5 +28,6 @@ public class Agent {
     private AgentStatus status;
 
     @OneToMany(mappedBy = "assignedAgent")
+    @JsonManagedReference
     private List<Order> orders;
 }

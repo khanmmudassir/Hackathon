@@ -1,53 +1,78 @@
 package com.project.hackathon.controller;
 
-import com.project.hackathon.constants.ProposalStatus;
+import com.project.hackathon.constants.AgentStatus;
+import com.project.hackathon.constants.SuggestionStatus;
+import com.project.hackathon.entity.Order;
 import com.project.hackathon.entity.ReassignmentProposal;
+import com.project.hackathon.repository.OrderRepository;
 import com.project.hackathon.repository.ProposalRepository;
 import com.project.hackathon.service.ReassignmentEngine;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
-@RequestMapping("/api/reassignments")
+@RequestMapping("/api")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "http://localhost:3000") // For React development
+@CrossOrigin(origins = "*")
 public class ReassignmentController {
 
     private final ProposalRepository proposalRepository;
+    private final OrderRepository orderRepository;
     private final ReassignmentEngine reassignmentEngine;
 
-    // 1. Get all pending recommendations for the Ops Dashboard
-    @GetMapping("/proposals")
+
+    @PostMapping("/orders")
+    public ResponseEntity<Order> createOrder(@RequestBody Order order) {
+        Order savedOrder = orderRepository.save(order);
+        return ResponseEntity.status(HttpStatus.CREATED).body(savedOrder);
+    }
+
+
+    @GetMapping("/orders")
+    public List<Order> getOrders(@RequestParam(required = false) String status) {
+        if (status != null && !status.isEmpty()) {
+            return orderRepository.findByStatus(status);
+        }
+        return orderRepository.findAll();
+    }
+
+    @PatchMapping("/agents/{id}/status")
+    public ResponseEntity<Void> updateAgentStatus(@PathVariable String id, @RequestBody Map<String, String> body) {
+        AgentStatus newStatus = AgentStatus.valueOf(body.get("status"));
+        reassignmentEngine.updateAgentAvailability(id,newStatus);
+
+        if ("OFFLINE".equalsIgnoreCase(String.valueOf(newStatus))) {
+            reassignmentEngine.handleAgentFailure(id, "Agent manually marked as offline");
+        }
+
+        return ResponseEntity.noContent().build();
+    }
+
+    @PatchMapping("/suggestions/{id}")
+    public ResponseEntity<Void> updateSuggestion(@PathVariable String id, @RequestBody Map<String, String> body) {
+        SuggestionStatus status = SuggestionStatus.valueOf(body.get("status"));
+
+        if ("ACCEPTED".equalsIgnoreCase(String.valueOf(status))) {
+            reassignmentEngine.approveReassignment(id);
+        } else if ("REJECTED".equalsIgnoreCase(String.valueOf(status))) {
+            reassignmentEngine.rejectReassignment(id);
+        } else {
+            return ResponseEntity.badRequest().build();
+        }
+
+        return ResponseEntity.ok().build();
+    }
+
+    // Existing endpoint for dashboard polling
+    @GetMapping("/reassignments/proposals")
     public List<ReassignmentProposal> getPendingProposals() {
         return proposalRepository.findAll().stream()
-                .filter(p -> "PENDING".equals(p.getStatus()))
+                .filter(p -> SuggestionStatus.PENDING.equals(p.getStatus()))
                 .toList();
-    }
-
-    // 2. Approve a recommendation (commits changes to Order/Agent)
-    @PostMapping("/approve/{id}")
-    public ResponseEntity<Void> approve(@PathVariable String id) {
-        reassignmentEngine.approveReassignment(id);
-        return ResponseEntity.ok().build();
-    }
-
-    // 3. Reject a recommendation
-    @PostMapping("/reject/{id}")
-    public ResponseEntity<Void> reject(@PathVariable String id) {
-        ReassignmentProposal proposal = proposalRepository.findById(id)
-                .orElseThrow();
-        proposal.setStatus(ProposalStatus.REJECTED);
-        proposalRepository.save(proposal);
-        return ResponseEntity.ok().build();
-    }
-
-    // 4. Manual trigger for testing: Simulate an agent going offline
-    @PostMapping("/simulate-failure")
-    public ResponseEntity<Void> simulateFailure(@RequestParam String agentId, @RequestParam String reason) {
-        reassignmentEngine.handleAgentFailure(agentId, reason);
-        return ResponseEntity.ok().build();
     }
 }

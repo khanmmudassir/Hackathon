@@ -1,7 +1,7 @@
 package com.project.hackathon.service;
 
 import com.project.hackathon.constants.AgentStatus;
-import com.project.hackathon.constants.ProposalStatus;
+import com.project.hackathon.constants.SuggestionStatus;
 import com.project.hackathon.data.AgentOfflineEvent;
 import com.project.hackathon.data.ReassignmentRecommendation;
 import com.project.hackathon.entity.Agent;
@@ -39,9 +39,9 @@ public class ReassignmentLoop {
             ReassignmentProposal proposal = ReassignmentProposal.builder()
                     .orderId(order.getId())
                     .recommendedAgentId(rec.agent().getId())
-                    .reason(rec.explanation()) // The AI's plain English explanation
+                    .reason(rec.explanation())
                     .confidenceScore(rec.confidenceScore())
-                    .status(ProposalStatus.PENDING)
+                    .status(SuggestionStatus.PENDING)
                     .build();
 
             proposalRepository.save(proposal);

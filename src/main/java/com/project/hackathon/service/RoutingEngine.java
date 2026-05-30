@@ -12,16 +12,13 @@ import java.util.Map;
 public class RoutingEngine {
 
     private final Map<String, RoutingStrategy> strategies;
-    private volatile String currentStrategyName = "ruleBasedRouting"; // Default strategy
+    private volatile String currentStrategyName = "aiPowered"; // Default strategy
 
     public RoutingEngine(Map<String, RoutingStrategy> strategies) {
         this.strategies = strategies;
     }
 
-    /**
-     * Switches the active routing strategy at runtime.
-     * @param strategyName The bean name of the desired strategy (e.g., "aiRoutingStrategy")
-     */
+
     public void setStrategy(String strategyName) {
         if (!strategies.containsKey(strategyName)) {
             throw new IllegalArgumentException("Strategy not found: " + strategyName);
@@ -29,9 +26,6 @@ public class RoutingEngine {
         this.currentStrategyName = strategyName;
     }
 
-    /**
-     * Delegates the recommendation logic to the currently active strategy.
-     */
     public ReassignmentRecommendation getBestAgent(Order order, List<Agent> candidates) {
         RoutingStrategy strategy = strategies.get(currentStrategyName);
 

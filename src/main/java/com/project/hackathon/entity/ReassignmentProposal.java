@@ -1,6 +1,6 @@
 package com.project.hackathon.entity;
 
-import com.project.hackathon.constants.ProposalStatus;
+import com.project.hackathon.constants.SuggestionStatus;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -21,7 +21,8 @@ public class ReassignmentProposal {
     private String recommendedAgentId;
 
     private String reason;
-    private ProposalStatus status;
+    @Enumerated(EnumType.STRING)
+    private SuggestionStatus status;
 
     private Double confidenceScore;
 }

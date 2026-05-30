@@ -3,7 +3,7 @@ INSERT INTO agents (id, name, active_order_count, status) VALUES
   ('AGT-002', 'Rahul Verma',   0, 'AVAILABLE'),
   ('AGT-003', 'Ananya Iyer',   1, 'BUSY'),
   ('AGT-004', 'Kiran Nair',    0, 'AVAILABLE'),
-  ('AGT-005', 'Deepak Mehta',  3, 'BUSY');
+  ('AGT-005', 'Deepak Mehta',  3, 'AVAILABLE');
 
 -- 8 orders: all ASSIGNED, spread across agents
 INSERT INTO orders (id, description, assigned_agent_id, status, created_at) VALUES
