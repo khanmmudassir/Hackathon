@@ -15,6 +15,10 @@ public class AiRoutingStrategy implements RoutingStrategy {
 
     @Override
     public ReassignmentRecommendation recommend(Order order, List<Agent> agents) {
+        if (agents == null || agents.isEmpty()) {
+            // Return a sensible default or a 'No Agent Found' result
+            return new ReassignmentRecommendation(null, 0.0, "No available agents found.");
+        }
         return aiAdvisor.analyzeAndRecommend(order, agents);
     }
 }

@@ -42,20 +42,55 @@ public class ReassignmentEngine {
 
     @Transactional
     public void approveReassignment(String proposalId) {
+        // 1. Retrieve the proposal
         ReassignmentProposal proposal = proposalRepository.findById(proposalId)
-                .orElseThrow(() -> new RuntimeException("Proposal not found"));
+                .orElseThrow(() -> new EntityNotFoundException("Proposal not found: " + proposalId));
 
-        Order order = orderRepository.findById(proposal.getOrderId()).get();
-        Agent newAgent = agentRepository.findById(proposal.getRecommendedAgentId()).get();
-        Agent oldAgent = agentRepository.findById(proposal.getOriginalAgentId()).get();
+        // 2. Retrieve involved entities
+        Order order = orderRepository.findById(proposal.getOrderId())
+                .orElseThrow(() -> new EntityNotFoundException("Order not found"));
+
+        Agent newAgent = agentRepository.findById(proposal.getRecommendedAgentId())
+                .orElseThrow(() -> new EntityNotFoundException("Target agent not found"));
+
+        Agent oldAgent = agentRepository.findById(proposal.getOriginalAgentId())
+                .orElseThrow(() -> new EntityNotFoundException("Original agent not found"));
+
+        // 3. Update Order state
         order.setAssignedAgent(newAgent);
         order.setStatus(OrderStatus.REASSIGNED);
 
-        newAgent.setActiveOrderCount(newAgent.getActiveOrderCount() + 1);
-        oldAgent.setActiveOrderCount(Math.max(0, oldAgent.getActiveOrderCount() - 1));
+        // 4. Update Old Agent state (Decrement load)
+        int currentOldLoad = oldAgent.getActiveOrderCount();
+        oldAgent.setActiveOrderCount(Math.max(0, currentOldLoad - 1));
 
+        // If the old agent was BUSY but now has capacity, set back to AVAILABLE
+        if (oldAgent.getStatus() == AgentStatus.BUSY) {
+            oldAgent.setStatus(AgentStatus.AVAILABLE);
+        }
+        if (newAgent.getStatus() != AgentStatus.AVAILABLE) {
+            // Mark this proposal as rejected because the agent is no longer eligible
+            proposal.setStatus(SuggestionStatus.REJECTED);
+            proposalRepository.save(proposal);
+
+            // Trigger a new search for a different agent immediately
+            List<String> excludedAgents = List.of(proposal.getOriginalAgentId(), newAgent.getId());
+            proposeNewAgent(order, excludedAgents, "Selected agent went offline before approval.");
+
+            throw new IllegalStateException("Cannot approve: Agent " + newAgent.getId() + " is no longer AVAILABLE.");
+        }
+
+        // 5. Update New Agent state (Increment load & Update Status)
+        newAgent.setActiveOrderCount(newAgent.getActiveOrderCount() + 1);
+
+        // LOGIC: Mark as BUSY if they have reached a certain threshold (e.g., 1 or more orders)
+        // Or if your business logic dictates they are BUSY as soon as they have an active order
+        newAgent.setStatus(AgentStatus.BUSY);
+
+        // 6. Finalize Proposal
         proposal.setStatus(SuggestionStatus.ACCEPTED);
 
+        // 7. Persist changes
         orderRepository.save(order);
         agentRepository.save(newAgent);
         agentRepository.save(oldAgent);
@@ -97,33 +132,26 @@ public class ReassignmentEngine {
             ReassignmentRecommendation result = routingEngine.getBestAgent(order, candidates);
 
             if (result != null && result.agent() != null) {
-                ReassignmentProposal newProposal = ReassignmentProposal.builder()
-                        .orderId(order.getId())
-                        .originalAgentId(excludedAgentIds.get(0))
-                        .recommendedAgentId(result.agent().getId())
-                        .reason(reason)
-                        .status(SuggestionStatus.PENDING)
-                        .confidenceScore(result.confidenceScore())
-                        .build();
-
-                proposalRepository.save(newProposal);
+                createProposal(order,excludedAgentIds.get(0),result.agent(),result.confidenceScore(),reason);
             }
         } catch(Exception e) {
             routingEngine.setStrategy("ruleBased");
             ReassignmentRecommendation result = routingEngine.getBestAgent(order, candidates);
-
             if (result != null && result.agent() != null) {
-                ReassignmentProposal newProposal = ReassignmentProposal.builder()
-                        .orderId(order.getId())
-                        .originalAgentId(excludedAgentIds.get(0))
-                        .recommendedAgentId(result.agent().getId())
-                        .reason(reason)
-                        .status(SuggestionStatus.PENDING)
-                        .confidenceScore(result.confidenceScore())
-                        .build();
-
-                proposalRepository.save(newProposal);
+            createProposal(order,excludedAgentIds.get(0),result.agent(),result.confidenceScore(),reason);
             }
         }
+    }
+
+    private void createProposal(Order order, String originalAgentId, Agent recommendedAgent, Double confidence, String reason) {
+        ReassignmentProposal newProposal = ReassignmentProposal.builder()
+                .orderId(order.getId())
+                .originalAgentId(originalAgentId)
+                .recommendedAgentId(recommendedAgent.getId())
+                .reason(reason)
+                .status(SuggestionStatus.PENDING)
+                .confidenceScore(confidence)
+                .build();
+        proposalRepository.save(newProposal);
     }
 }

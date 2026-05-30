@@ -13,6 +13,10 @@ public class RuleBasedRoutingStrategy implements RoutingStrategy {
 
     @Override
     public ReassignmentRecommendation recommend(Order order, List<Agent> agents) {
+        if (agents == null || agents.isEmpty()) {
+            // Return a sensible default or a 'No Agent Found' result
+            return new ReassignmentRecommendation(null, 0.0, "No available agents found.");
+        }
         Agent best = agents.stream()
                 .min(Comparator.comparingInt(Agent::getActiveOrderCount))
                 .orElseThrow();
